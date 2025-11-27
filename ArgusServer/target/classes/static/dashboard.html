@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <title>Argus Dashboard - Realtime</title>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  <style>
+    /* ======= ESTILOS ======= */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #eee;
+      padding: 20px;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+      color: #00bcd4;
+    }
+
+    .dashboard {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: flex-start;
+    }
+
+    .user-card {
+      background-color: #1c1c1c;
+      border: 1px solid #333;
+      border-radius: 10px;
+      width: 220px;
+      padding: 12px;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+      transition: transform 0.2s ease;
+    }
+
+    .user-card:hover { transform: scale(1.05); }
+
+    .user-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .exam-name {
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .status-type {
+      font-size: 14px;
+      color: #ccc;
+    }
+
+    .indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .active .indicator { background-color: #28a745; }
+    .inactive .indicator { background-color: #dc3545; }
+
+    .event-log {
+      background: #000;
+      border-radius: 6px;
+      padding: 4px;
+      font-size: 12px;
+      color: #0f0;
+      margin-top: 6px;
+      height: 80px;
+      overflow-y: auto;
+      font-family: monospace;
+    }
+	
+	.user-card.green { border-color: #28a745; }
+	.user-card.yellow { border-color: #ffc107; }
+	.user-card.red { border-color: #dc3545; }
+
+  </style>
+</head>
+<body>
+  <h2>📡 Argus Dashboard (Realtime)</h2>
+  <div id="dashboard" class="dashboard"></div>
+
+  <script>
+    const socket = new SockJS('/ws');
+    const client = Stomp.over(socket);
+    const dashboard = document.getElementById('dashboard');
+    const users = {}; // mapa de alunos (student+exam) → card
+
+    // Marca inativos após 10 segundos sem evento
+    const INACTIVE_TIMEOUT = 10000;
+
+    client.connect({}, function(frame) {
+      console.log('✅ Connected: ' + frame);
+
+      client.subscribe('/topic/events', function(message) {
+        let event = {};
+        try { event = JSON.parse(message.body); } catch(e) { return; }
+
+        const key = `${event.exam}_${event.student}`;
+        let card = users[key];
+
+        // Cria novo card se for um novo aluno
+        if (!card) {
+          card = createUserCard(event);
+          users[key] = card;
+          dashboard.appendChild(card.element);
+        }
+
+        // Atualiza card existente
+        updateUserCard(card, event);
+      });
+    }, function(err) {
+      console.error('❌ STOMP error', err);
+    });
+
+    // === Criação de um novo card de usuário ===
+    function createUserCard(event) {
+      const element = document.createElement('div');
+      element.className = 'user-card active';
+      element.innerHTML = `
+        <div class="user-name">	  <a href="/student.html?exam=${encodeURIComponent(event.exam)}&student=${encodeURIComponent(event.student)}" target="_blank" style="color:#00bcd4;text-decoration:none;">
+${event.student || 'Anônimo'}</div>
+        <div class="exam-name">${event.exam || 'Desconhecido'}</div>
+        <div class="status">
+          <span class="status-type">${event.type || '-'}</span>
+          <div class="indicator"></div>
+        </div>
+        <div class="event-log"></div>
+      `;
+      return { element, lastUpdate: Date.now() };
+    }
+
+    // === Atualiza dados no card ===
+    function updateUserCard(card, event) {
+      const el = card.element;
+
+	  el.classList.add('active');
+      el.classList.remove('inactive');
+
+      el.querySelector('.status-type').textContent = event.type;
+
+      const log = el.querySelector('.event-log');
+      //const msg = `[${new Date().toLocaleTimeString()}] ${event.type} (${event.code})`;
+	  const msg = `[${new Date().toLocaleTimeString()}] ${event.type} (${event.action || 'N/A'})`;
+	  log.prepend(document.createTextNode(msg + "\n"));
+
+	  //Renderizacao de nivel de alerta
+	  el.classList.remove('green', 'yellow', 'red');
+	    el.classList.add(event.level || 'green');
+
+	    el.querySelector('.status-type').textContent = `${event.type} (${event.level})`;
+
+	    const indicator = el.querySelector('.indicator');
+	    indicator.style.backgroundColor =
+	      event.level === 'red' ? '#dc3545' :
+	      event.level === 'yellow' ? '#ffc107' :
+	      '#28a745';
+		  
+      // Mantém só os últimos 10 logs
+      if (log.childNodes.length > 10) {
+        log.removeChild(log.lastChild);
+      }
+
+      // Atualiza o tempo da última atividade
+      card.lastUpdate = Date.now();
+    }
+
+    // === Checa inatividade periodicamente ===
+    setInterval(() => {
+      const now = Date.now();
+      Object.values(users).forEach(card => {
+        const elapsed = now - card.lastUpdate;
+        const el = card.element;
+        if (elapsed > INACTIVE_TIMEOUT && !el.classList.contains('inactive')) {
+          el.classList.remove('active');
+          el.classList.add('inactive');
+        }
+      });
+    }, 2000);
+  </script>
+</body>
+</html>
