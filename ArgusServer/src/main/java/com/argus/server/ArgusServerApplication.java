@@ -11,7 +11,7 @@ public class ArgusServerApplication {
     public static void main(String[] args) {
         SpringApplication.run(ArgusServerApplication.class, args);
     }
-    
+
     @EventListener
     public void onApplicationEvent(WebServerInitializedEvent event) {
     	this.serverPort = event.getWebServer().getPort();

@@ -20,9 +20,4 @@ public class EventService {
     public EventEntity save(EventEntity e) {
         return repo.save(e);
     }
-}    
-//    @GetMapping("/json")
-//    public List<EventEntity> exportJson() {
-//        return repo.findAll();
-//    }
-//}
+}

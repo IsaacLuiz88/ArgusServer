@@ -1,21 +1,101 @@
 <!doctype html>
-<html>
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Argus - Detalhes do Aluno</title>
   <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 12px; background:#111; color:#eee; }
-    h2 { color:#00bcd4; }
-    #events { max-height: 80vh; overflow:auto; border:1px solid #333; padding:8px; background:#000; }
-    .evt { padding:4px; border-bottom:1px solid #222; font-family:monospace; color:#0f0; }
+    /* ======= CORE STYLES ======= */
+    :root {
+      --color-primary: #00bcd4;
+      --color-green: #28a745;
+      --color-yellow: #ffc107;
+      --color-red: #dc3545;
+      --color-purple: #9c27b0; /* ArgusVision */
+      --color-bg-dark: #111;
+      --color-card-bg: #1e1e1e;
+      --color-border: #333;
+      --color-text-light: #eee;
+    }
+
+    body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        padding: 20px; 
+        background: var(--color-bg-dark); 
+        color: var(--color-text-light); 
+    }
+    
+    h2 { 
+        color: var(--color-primary); 
+        border-bottom: 2px solid var(--color-border);
+        padding-bottom: 5px;
+        margin-bottom: 10px;
+    }
+
+    #header-info {
+        margin-bottom: 20px;
+        font-size: 1.1em;
+    }
+
+    /* ======= EVENT LOG AREA ======= */
+    #events { 
+        max-height: 75vh; 
+        overflow-y:auto; 
+        border: 1px solid var(--color-border); 
+        border-radius: 8px;
+        padding: 10px; 
+        background: var(--color-card-bg); 
+    }
+    
+    .evt { 
+        padding: 8px; 
+        margin-bottom: 5px;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+    .evt:hover { background: #222; }
+
+    /* Estilos de nível de alerta */
+    .level-green { color: var(--color-green); }
+    .level-yellow { color: var(--color-yellow); }
+    .level-red { color: var(--color-red); }
+
+    .evt-time { font-weight: bold; margin-right: 10px; }
+
+    /* Imagem (apenas para eventos de visão) */
+    .evt-image {
+        max-width: 100%;
+        max-height: 200px;
+        margin-top: 10px;
+        border: 2px solid var(--color-border);
+        border-radius: 4px;
+        display: block;
+    }
+
+    /* Estilos para o corpo da mensagem (cores do seu request) */
+    .evt-message { font-family: 'Consolas', monospace; }
+    
+    /* 1. ArgusVision (Visão) */
+    .evt-vision .evt-message { color: var(--color-purple); } 
+    
+    /* 2. Plugin/Outros (Teclado/Mouse/Foco) */
+    .evt-plugin .evt-message { color: var(--color-yellow); }
+    
+    /* 3. Padrão (Fallback) */
+    .evt-default .evt-message { color: var(--color-text-light); }
+
   </style>
 </head>
 <body>
-  <h2>👤 Aluno: <span id="studentName"></span></h2>
-  <div>Prova: <span id="examName"></span></div>
-  <hr><br>
+  <h2>👤 Detalhes do Aluno</h2>
+  <div id="header-info">
+      <strong>Aluno:</strong> <span id="studentName"></span> | 
+      <strong>Prova:</strong> <span id="examName"></span>
+  </div>
+  
+  <h3>Logs de Eventos</h3>
   <div id="events"></div>
 
   <script>
@@ -28,31 +108,54 @@
 
     const socket = new SockJS('/ws');
     const client = Stomp.over(socket);
+    
+    // Função auxiliar para determinar a classe de estilo da mensagem
+    function getEventClass(eventType) {
+        if (eventType.toLowerCase() === 'vision') return 'evt-vision';
+        if (['keyboard', 'mouse', 'focus', 'pause'].includes(eventType.toLowerCase())) return 'evt-plugin';
+        return 'evt-default';
+    }
+	
+	// Função auxiliar para determinar a classe de estilo da mensagem
+	   function getEventClass(eventType) {
+	        // 1. ROXO para eventos de Visão (ArgusVision)
+	        if (eventType.toLowerCase() === 'vision') return 'evt-vision';
+	        // 2. AMARELO para eventos do Plugin (Teclado, Mouse, Foco, Pausa)
+	        if (['keyboard', 'mouse', 'focus', 'pause'].includes(eventType.toLowerCase())) return 'evt-plugin';
+	        // 3. Padrão (Neutro)
+	        return 'evt-default';
+	   }
+
     client.connect({}, function(frame) {
       console.log('Connected: ' + frame);
       client.subscribe('/topic/events', function(message) {
         let event;
         try { event = JSON.parse(message.body); } catch(e) { return; }
 
-        // Mostra somente o aluno/prova correspondente
         if (event.student === student && event.exam === exam) {
           const el = document.createElement('div');
-          el.className = 'evt';
+		  // Aplica a classe baseada no tipo de evento
+          const eventClass = getEventClass(event.type);
+          el.className = `evt ${eventClass}`;
 		  
-	  // 1. Converte o timestamp do CLIENTE (event.time) para hora local
-        const clientTime = new Date(event.time).toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
-        });
-	  // 2. Cria a mensagem formatada: [HORA CLIENTE] TIPO (AÇÃO)
+          const clientTime = new Date(event.time).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          });
+	  
           let actionDetail = event.action || (event.x && event.y ? `(${event.x}, ${event.y})` : 'N/A');
-          const formattedMessage = `[${clientTime}] ${event.type.toUpperCase()}: ${actionDetail} | Level: ${event.level.toUpperCase()}`;
-		  el.textContent = formattedMessage;
           
-		// O JSON completo é mantido no console para debug
-		// console.log(JSON.stringify(event));
+          // Mensagem formatada
+          const messageHtml = `
+            <span class="evt-time">[${clientTime}]</span>
+            <span class="evt-message">${event.type.toUpperCase()} (${actionDetail})</span>
+            | Nível: <strong class="level-${event.level}">${event.level.toUpperCase()}</strong>
+          `;
+          
+          el.innerHTML = messageHtml;
+
 		  document.getElementById('events').prepend(el);
         }
       });

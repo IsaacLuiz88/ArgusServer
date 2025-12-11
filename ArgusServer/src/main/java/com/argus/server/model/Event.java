@@ -12,10 +12,9 @@ public class Event {
     private long time;
     private String student;
     private String exam;
-
     private String level;      // "green", "yellow", "red"
     private long timestamp;    // para o servidor marcar a hora de recebimento
-
+    private String image;
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
@@ -46,6 +45,9 @@ public class Event {
 
 	public long getTimestamp() { return timestamp; }
 	public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+	
+	public String getImage() {return image;}
+	public void setImage(String image) {this.image = image;}
 	
 	@Override
     public String toString() {

@@ -18,7 +18,6 @@ public class CSVUtil {
                 e.getLevel(), e.getTimestamp()
             ));
         }
-
         return sb.toString();
     }
 }

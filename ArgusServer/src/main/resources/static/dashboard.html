@@ -2,104 +2,150 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Argus Dashboard - Realtime</title>
   <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
   <style>
-    /* ======= ESTILOS ======= */
+    /* ======= RESET & CORE STYLES ======= */
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --color-primary: #00bcd4;
+      --color-green: #28a745;
+      --color-yellow: #ffc107;
+      --color-red: #dc3545;
+      --color-purple: #9c27b0; /* ArgusVision */
+      --color-bg-dark: #111;
+      --color-card-bg: #1e1e1e;
+      --color-border: #333;
+      --color-text-light: #eee;
+      --color-text-muted: #aaa;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--color-bg-dark);
+      color: var(--color-text-light);
       padding: 20px;
     }
 
     h2 {
-      margin-bottom: 10px;
-      color: #00bcd4;
+      margin-bottom: 20px;
+      color: var(--color-primary);
+      border-bottom: 2px solid var(--color-border);
+      padding-bottom: 10px;
     }
 
+    /* ======= DASHBOARD LAYOUT (RESPONSIVE) ======= */
     .dashboard {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      justify-content: flex-start;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
     }
 
+    /* ======= USER CARD ======= */
     .user-card {
-      background-color: #1c1c1c;
-      border: 1px solid #333;
+      background-color: var(--color-card-bg);
+      border: 2px solid var(--color-border);
+      border-left: 6px solid var(--color-border); /* Destaque na borda esquerda */
       border-radius: 10px;
-      width: 220px;
-      padding: 12px;
-      box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
-      transition: transform 0.2s ease;
+      padding: 15px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      transition: all 0.2s ease-in-out;
+      position: relative;
     }
 
-    .user-card:hover { transform: scale(1.05); }
+    .user-card:hover { 
+      transform: translateY(-4px); 
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Cores de Nível (Alerta) */
+    .user-card.green { border-left-color: var(--color-green); }
+    .user-card.yellow { border-left-color: var(--color-yellow); }
+    .user-card.red { border-left-color: var(--color-red); }
+
+    .header-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
 
     .user-name {
-      font-size: 18px;
-      font-weight: bold;
-      color: #fff;
+      font-size: 1.15em;
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+    .user-name a {
+        color: inherit;
+        text-decoration: none;
     }
 
     .exam-name {
-      font-size: 13px;
-      color: #aaa;
+      font-size: 0.85em;
+      color: var(--color-text-muted);
     }
 
     .status {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
       margin-top: 10px;
+      border-top: 1px solid #282828;
+      padding-top: 8px;
     }
 
     .status-type {
-      font-size: 14px;
-      color: #ccc;
+      font-size: 0.9em;
+      font-weight: bold;
     }
-
+    
     .indicator {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
+      box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+      position: absolute; /* Indicador no canto superior direito */
+      top: 10px;
+      right: 10px;
     }
 
-    .active .indicator { background-color: #28a745; }
-    .inactive .indicator { background-color: #dc3545; }
+    .inactive .indicator { background-color: var(--color-red); }
+    .active .indicator { background-color: var(--color-green); }
 
+    /* Log de Eventos */
     .event-log {
       background: #000;
+      border: 1px solid #222;
       border-radius: 6px;
-      padding: 4px;
-      font-size: 12px;
-      color: #0f0;
-      margin-top: 6px;
-      height: 80px;
+      padding: 6px;
+      font-size: 0.75em;
+      height: 100px;
       overflow-y: auto;
-      font-family: monospace;
+      margin-top: 10px;
+      font-family: 'Consolas', monospace;
+      white-space: pre; /* Mantém as quebras de linha */
     }
 	
-	.user-card.green { border-color: #28a745; }
-	.user-card.yellow { border-color: #ffc107; }
-	.user-card.red { border-color: #dc3545; }
+	/* Estilos de Mensagens */
+	.log-message {
+		display: block;
+		margin: 0;
+		line-height: 1.4;
+	}
+	.log-default { color: var(--color-text-light); } /* Cor padrão */
+	.log-vision { color: var(--color-purple); } /* ArgusVision - Roxo */
+	.log-plugin { color: var(--color-yellow); } /* Outros Plugins/Eventos - Amarelo */
 
   </style>
 </head>
 <body>
-  <h2>📡 Argus Dashboard (Realtime)</h2>
+  <h2>📡 Argus Dashboard (Monitoramento em Tempo Real)</h2>
   <div id="dashboard" class="dashboard"></div>
 
   <script>
     const socket = new SockJS('/ws');
     const client = Stomp.over(socket);
     const dashboard = document.getElementById('dashboard');
-    const users = {}; // mapa de alunos (student+exam) → card
-
-    // Marca inativos após 10 segundos sem evento
+    const users = {}; 
     const INACTIVE_TIMEOUT = 10000;
 
     client.connect({}, function(frame) {
@@ -112,73 +158,102 @@
         const key = `${event.exam}_${event.student}`;
         let card = users[key];
 
-        // Cria novo card se for um novo aluno
         if (!card) {
           card = createUserCard(event);
           users[key] = card;
           dashboard.appendChild(card.element);
         }
 
-        // Atualiza card existente
         updateUserCard(card, event);
       });
     }, function(err) {
       console.error('❌ STOMP error', err);
     });
 
-    // === Criação de um novo card de usuário ===
+    // Função auxiliar para determinar a classe de cor
+    function getMessageClass(eventType) {
+        if (eventType.toLowerCase() === 'vision') {
+            return 'log-vision'; // Roxo para Visão
+        }
+        // Assumindo que o seu "plugin" envia eventos de teclado/mouse/foco
+        if (['keyboard', 'mouse', 'focus', 'pause'].includes(eventType.toLowerCase())) {
+            return 'log-plugin'; // Amarelo para Plugins/Eventos
+        }
+        return 'log-default'; // Cor padrão (branca/cinza)
+    }
+	
+	// Função auxiliar para determinar a classe de cor
+	    function getMessageClass(eventType) {
+	        // 1. ROXO para eventos de Visão (ArgusVision)
+	        if (eventType.toLowerCase() === 'vision') {
+	            return 'log-vision'; 
+	        }
+	        // 2. AMARELO para eventos do Plugin (Teclado, Mouse, Foco, Pausa)
+	        if (['keyboard', 'mouse', 'focus', 'pause'].includes(eventType.toLowerCase())) {
+	            return 'log-plugin'; 
+	        }
+	        // 3. Padrão (Neutro)
+	        return 'log-default'; 
+	    }
+
     function createUserCard(event) {
       const element = document.createElement('div');
       element.className = 'user-card active';
       element.innerHTML = `
-        <div class="user-name">	  <a href="/student.html?exam=${encodeURIComponent(event.exam)}&student=${encodeURIComponent(event.student)}" target="_blank" style="color:#00bcd4;text-decoration:none;">
-${event.student || 'Anônimo'}</div>
+        <div class="header-info">
+            <div class="user-name">	
+                <a href="/student.html?exam=${encodeURIComponent(event.exam)}&student=${encodeURIComponent(event.student)}" target="_blank" title="Ver Detalhes">
+                    ${event.student || 'Anônimo'}
+                </a>
+            </div>
+            <div class="indicator"></div>
+        </div>
         <div class="exam-name">${event.exam || 'Desconhecido'}</div>
         <div class="status">
-          <span class="status-type">${event.type || '-'}</span>
-          <div class="indicator"></div>
+          <span class="status-type">Último Evento: N/A</span>
         </div>
         <div class="event-log"></div>
       `;
       return { element, lastUpdate: Date.now() };
     }
 
-    // === Atualiza dados no card ===
     function updateUserCard(card, event) {
       const el = card.element;
-
 	  el.classList.add('active');
       el.classList.remove('inactive');
 
-      el.querySelector('.status-type').textContent = event.type;
-
+      // 1. Atualiza Log de Eventos
       const log = el.querySelector('.event-log');
-      //const msg = `[${new Date().toLocaleTimeString()}] ${event.type} (${event.code})`;
 	  const msg = `[${new Date().toLocaleTimeString()}] ${event.type} (${event.action || 'N/A'})`;
-	  log.prepend(document.createTextNode(msg + "\n"));
+	  
+	  const msgElement = document.createElement('span');
+	  msgElement.className = `log-message ${getMessageClass(event.type)}`;
+	  msgElement.textContent = msg;
 
-	  //Renderizacao de nivel de alerta
-	  el.classList.remove('green', 'yellow', 'red');
-	    el.classList.add(event.level || 'green');
-
-	    el.querySelector('.status-type').textContent = `${event.type} (${event.level})`;
-
-	    const indicator = el.querySelector('.indicator');
-	    indicator.style.backgroundColor =
-	      event.level === 'red' ? '#dc3545' :
-	      event.level === 'yellow' ? '#ffc107' :
-	      '#28a745';
-		  
-      // Mantém só os últimos 10 logs
-      if (log.childNodes.length > 10) {
+	  log.prepend(msgElement);
+	  
+      // Mantém só os últimos 8 logs
+      if (log.children.length > 8) {
         log.removeChild(log.lastChild);
       }
 
-      // Atualiza o tempo da última atividade
+      // 2. Renderização de Nível de Alerta
+	  el.classList.remove('green', 'yellow', 'red');
+	    el.classList.add(event.level || 'green');
+
+	    const statusTypeEl = el.querySelector('.status-type');
+	    statusTypeEl.textContent = `Último Evento: ${event.type} | Nível: ${event.level.toUpperCase()}`;
+        
+        statusTypeEl.style.color = 
+          event.level === 'red' ? 'var(--color-red)' :
+          event.level === 'yellow' ? 'var(--color-yellow)' :
+          'var(--color-green)';
+		  
+      // 3. Atualiza o tempo da última atividade
       card.lastUpdate = Date.now();
     }
 
-    // === Checa inatividade periodicamente ===
+    // Checa inatividade periodicamente
     setInterval(() => {
       const now = Date.now();
       Object.values(users).forEach(card => {
@@ -187,6 +262,8 @@ ${event.student || 'Anônimo'}</div>
         if (elapsed > INACTIVE_TIMEOUT && !el.classList.contains('inactive')) {
           el.classList.remove('active');
           el.classList.add('inactive');
+          el.querySelector('.status-type').textContent = 'DESCONECTADO';
+          el.querySelector('.status-type').style.color = 'var(--color-red)';
         }
       });
     }, 2000);

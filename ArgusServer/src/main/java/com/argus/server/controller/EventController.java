@@ -33,22 +33,22 @@ public class EventController {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
-    
+
     @Autowired
     private EventRepository eventRepository;
-    
+
     @Autowired
     private EventService eventService;
 
     @Autowired
     private ActivityService activityService;
-    
+
     @PostMapping
     public String receiveEvent(@RequestBody Event event) throws JsonProcessingException {
     	event.setLevel(EventClassifier.classify(event));
     	event.setTimestamp(System.currentTimeMillis());
     	events.add(event);
-        
+
     	// persist
         EventEntity ent = new EventEntity();
         ent.setType(event.getType());
@@ -61,9 +61,10 @@ public class EventController {
         ent.setExam(event.getExam());
         ent.setLevel(event.getLevel());
         ent.setTimestamp(event.getTimestamp());
+        ent.setImage(event.getImage());
         eventService.save(ent);
         ent.setRaw(new ObjectMapper().writeValueAsString(event));
-        
+
         eventRepository.save(ent); // salvar somente uma vez
         activityService.touch(event.getStudent(), event.getExam()); // atualizar Redis
         saveEventToLog(event, event.getStudent(), event.getExam()); // salvar em arquivo
