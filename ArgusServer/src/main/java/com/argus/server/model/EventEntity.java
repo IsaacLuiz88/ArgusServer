@@ -64,7 +64,5 @@ public class EventEntity {
 	public void setRaw(String raw) {this.raw = raw;}
 
 	public String getImage() {return image;}
-	public void setImage(String image) {this.image = image;}
-	
-	
+	public void setImage(String image) {this.image = image;}	
 }
