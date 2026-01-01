@@ -18,4 +18,12 @@ public class SessionController {
     public Session active() {
         return active;
     }
+
+    @PostMapping("/end/{student}")
+    public void end(@PathVariable String student) {
+        if (active != null && student.equals(active.getStudent())) {
+            System.out.println("[SESSION] encerrada para " + student);
+            active = null;
+        }
+    }
 }

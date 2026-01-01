@@ -1,21 +1,15 @@
 package com.argus.server.controller;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.argus.server.config.EventClassifier;
 import com.argus.server.model.Event;
 import com.argus.server.model.EventEntity;
 import com.argus.server.repository.EventRepository;
 import com.argus.server.service.ActivityService;
 import com.argus.server.service.EventService;
-import com.argus.server.util.CSVUtil;
 
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.repository.ListCrudRepository;
 
 import java.util.*;
 import java.io.*;
@@ -29,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class EventController {
 
     private final List<Event> events = Collections.synchronizedList(new ArrayList<>());
-    //private static final String LOG_FILE = "events_server.log";
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
@@ -45,7 +38,6 @@ public class EventController {
 
     @PostMapping
     public String receiveEvent(@RequestBody Event event) throws JsonProcessingException {
-    	event.setLevel(EventClassifier.classify(event));
     	event.setTimestamp(System.currentTimeMillis());
     	events.add(event);
 
@@ -59,7 +51,6 @@ public class EventController {
         ent.setTime(event.getTime());
         ent.setStudent(event.getStudent());
         ent.setExam(event.getExam());
-        ent.setLevel(event.getLevel());
         ent.setTimestamp(event.getTimestamp());
         ent.setImage(event.getImage());
         eventService.save(ent);
@@ -92,18 +83,4 @@ public class EventController {
             e.printStackTrace();
         }
     }
-//    @GetMapping("/csv")
-//    public ResponseEntity<String> exportCsv() {
-//        ListCrudRepository<EventEntity, Long> repo = null;
-//        List<EventEntity> list = repo.findAll();
-//        return ResponseEntity.ok(CSVUtil.toCSV(list));
-//    }
 }
-    
-    /*
-    @PostMapping("/api/events")
-    public ResponseEntity<String> receiveEvent(@RequestBody String eventJson) {
-        System.out.println("Evento recebido: " + eventJson);
-        // TODO: salvar no banco de dados, ou mandar pro painel do professor
-        return ResponseEntity.ok("Recebido com sucesso");
-    }*/

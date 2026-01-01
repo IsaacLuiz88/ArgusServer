@@ -7,153 +7,223 @@
   <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
   <style>
-    /* ======= RESET & CORE STYLES ======= */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* ======= NEON PURPLE THEME ======= */
     :root {
-      --color-primary: #00bcd4;
-      --color-green: #28a745;
-      --color-yellow: #ffc107;
-      --color-red: #dc3545;
-      --color-purple: #9c27b0; /* ArgusVision */
-      --color-bg-dark: #111;
-      --color-card-bg: #1e1e1e;
-      --color-border: #333;
-      --color-text-light: #eee;
-      --color-text-muted: #aaa;
+      --bg-deep: #0a0a0c;
+      --card-bg: rgba(30, 30, 35, 0.7);
+      --neon-purple: #bc13fe;
+      --neon-blue: #00d2ff;
+      --color-green: #39ff14; /* Neon Green */
+      --color-yellow: #f0f000;
+      --color-red: #ff3131;
+      --text-main: #e0e0e0;
+      --text-dim: #a0a0a0;
+      --border-color: rgba(188, 19, 254, 0.2);
     }
 
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--color-bg-dark);
-      color: var(--color-text-light);
-      padding: 20px;
+      font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-deep);
+      background-image: radial-gradient(circle at 50% -20%, #25103f 0%, #0a0a0c 80%);
+      color: var(--text-main);
+      padding: 30px;
+      min-height: 100vh;
     }
 
     h2 {
-      margin-bottom: 20px;
-      color: var(--color-primary);
-      border-bottom: 2px solid var(--color-border);
-      padding-bottom: 10px;
+      font-weight: 300;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--neon-purple);
+      text-shadow: 0 0 10px rgba(188, 19, 254, 0.5);
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
     }
 
-    /* ======= DASHBOARD LAYOUT (RESPONSIVE) ======= */
+    /* ======= GRID ======= */
     .dashboard {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 25px;
     }
 
-    /* ======= USER CARD ======= */
+    /* ======= NEON CARDS ======= */
     .user-card {
-      background-color: var(--color-card-bg);
-      border: 2px solid var(--color-border);
-      border-left: 6px solid var(--color-border); /* Destaque na borda esquerda */
-      border-radius: 10px;
-      padding: 15px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-      transition: all 0.2s ease-in-out;
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
       position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
     }
 
-    .user-card:hover { 
-      transform: translateY(-4px); 
-      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.7);
+    .user-card::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 4px;
+        background: var(--neon-purple);
+        opacity: 0.5;
     }
 
-    /* Cores de Nível (Alerta) */
-    .user-card.green { border-left-color: var(--color-green); }
-    .user-card.yellow { border-left-color: var(--color-yellow); }
-    .user-card.red { border-left-color: var(--color-red); }
+    .user-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--neon-purple);
+      box-shadow: 0 10px 30px rgba(188, 19, 254, 0.15);
+    }
 
     .header-info {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 15px;
     }
 
-    .user-name {
-      font-size: 1.15em;
-      font-weight: 600;
-      color: var(--color-primary);
-    }
     .user-name a {
-        color: inherit;
-        text-decoration: none;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+      transition: 0.2s;
     }
+    .user-name a:hover { color: var(--neon-purple); }
 
     .exam-name {
-      font-size: 0.85em;
-      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 15px;
+      font-style: italic;
     }
 
-    .status {
-      margin-top: 10px;
-      border-top: 1px solid #282828;
-      padding-top: 8px;
+    .indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
     }
+
+    .active .indicator { color: var(--color-green); background-color: var(--color-green); }
+    .inactive .indicator { color: var(--color-red); background-color: var(--color-red); opacity: 0.5; }
+
+	.online {
+	  color: var(--color-green);
+	  font-weight: bold;
+	}
+
+	.offline {
+	  color: var(--color-red);
+	  font-weight: bold;
+	}
+
+    /* ======= LOG AREA ======= */
+    .event-log {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.75rem;
+      height: 120px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .log-message {
+      display: block;
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+    }
+    .log-vision { color: var(--neon-purple); text-shadow: 0 0 5px rgba(188, 19, 254, 0.3); }
+	
+	.log-keyboard {
+		color: var(--neon-blue); 
+	}
+	
+/* 	.log-keyboard {
+	  color: #0a7c86;} */ /* azul petróleo */
+	
+    .log-focus {
+	  color: #ff9f1c; /* laranja */
+	  text-shadow: 0 0 4px rgba(255, 159, 28, 0.4);
+	}
+    /* .log-plugin { color: var(--neon-blue); } */
+    .log-default { color: var(--text-dim); }
 
     .status-type {
-      font-size: 0.9em;
+      font-size: 0.75rem;
+      text-transform: uppercase;
       font-weight: bold;
-    }
-    
-    .indicator {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
-      position: absolute; /* Indicador no canto superior direito */
-      top: 10px;
-      right: 10px;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      display: block;
     }
 
-    .inactive .indicator { background-color: var(--color-red); }
-    .active .indicator { background-color: var(--color-green); }
-
-    /* Log de Eventos */
-    .event-log {
-      background: #000;
-      border: 1px solid #222;
-      border-radius: 6px;
-      padding: 6px;
-      font-size: 0.75em;
-      height: 100px;
-      overflow-y: auto;
+	.vision-frame {
+      width: 100%;
       margin-top: 10px;
-      font-family: 'Consolas', monospace;
-      white-space: pre; /* Mantém as quebras de linha */
+      border-radius: 10px;
+      display: none;
     }
-	
-	/* Estilos de Mensagens */
-	.log-message {
-		display: block;
-		margin: 0;
-		line-height: 1.4;
-	}
-	.log-default { color: var(--color-text-light); } /* Cor padrão */
-	.log-vision { color: var(--color-purple); } /* ArgusVision - Roxo */
-	.log-plugin { color: var(--color-yellow); } /* Outros Plugins/Eventos - Amarelo */
 
+	.log-vision-frame {
+	  color: #00ff9c;
+	  text-shadow: 0 0 5px rgba(0, 255, 156, 0.4);
+	}
+
+    /* Scrollbar minimalista */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--neon-purple); border-radius: 10px; }
   </style>
+  <link rel="icon" type="image/png" href="icons/Argus_Mascote_20250825_2025_16x24.png">
 </head>
 <body>
-  <h2>📡 Argus Dashboard (Monitoramento em Tempo Real)</h2>
+
+  <h2><span style="color:var(--neon-purple)">●</span> Argus Vision Realtime</h2>
+  
   <div id="dashboard" class="dashboard"></div>
 
   <script>
+	const EVENTOS_PT = {
+	        "NO_FACE": "SEM ROSTO",
+	        "FACE_CENTER": "ROSTO_CENTRO",
+	        "FACE_LEFT": "ROSTO_ESQUERDA",
+	        "FACE_RIGHT": "ROSTO_DIREITA",
+	        "FACE_UP": "ROSTO_CIMA",
+	        "FACE_DOWN": "ROSTO_BAIXO",
+	        "ROSTO_CENTRO": "ROSTO_CENTRO",
+	        "ROSTO_ESQUERDA": "ROSTO_ESQUERDA",
+	        "ROSTO_DIREITA": "ROSTO_DIREITA",
+	        "ROSTO_CIMA": "ROSTO_CIMA",
+	        "ROSTO_BAIXO": "ROSTO_BAIXO"
+	    };
+
     const socket = new SockJS('/ws');
     const client = Stomp.over(socket);
+    client.debug = null;
+
     const dashboard = document.getElementById('dashboard');
-    const users = {}; 
-    const INACTIVE_TIMEOUT = 10000;
+    const users = {};
 
-    client.connect({}, function(frame) {
-      console.log('✅ Connected: ' + frame);
+    const PLUGIN_TIMEOUT = 20000;
+    const VISION_TIMEOUT = 20000;
 
-      client.subscribe('/topic/events', function(message) {
-        let event = {};
-        try { event = JSON.parse(message.body); } catch(e) { return; }
+    client.connect({}, function () {
+      client.subscribe('/topic/events', function (message) {
+        let event;
+        try {
+          event = JSON.parse(message.body);
+        } catch {
+          return;
+        }
+		
+		// 🔹 Ignora eventos de movimento
+		  if (event.action && event.action.startsWith('MOTION')) {
+		    return;
+		  }
 
         const key = `${event.exam}_${event.student}`;
         let card = users[key];
@@ -164,109 +234,158 @@
           dashboard.appendChild(card.element);
         }
 
+        const now = Date.now();
+
+        // 🔹 Atualiza timestamps por tipo
+		if (event.type === 'vision' || event.type === 'vision_frame') card.lastVision = now;
+		if (event.type === 'keyboard' || event.type === 'shortcut' || event.type === 'focus') card.lastPlugin = now;
+		if (event.type === 'heartbeat') return;
+        // 🔹 Frame Base64
+        if (event.type === 'vision_frame') {
+          const img = card.element.querySelector('.vision-frame');
+          if (img) {
+            img.src = `data:image/jpeg;base64,${event.image}`;
+            img.style.display = 'block';
+          }
+          //return;
+		  updateUserCard(card, event);
+		  return;
+        }
+
+        // 🔹 Log normal
         updateUserCard(card, event);
       });
-    }, function(err) {
-      console.error('❌ STOMP error', err);
     });
-
-    // Função auxiliar para determinar a classe de cor
-    function getMessageClass(eventType) {
-        if (eventType.toLowerCase() === 'vision') {
-            return 'log-vision'; // Roxo para Visão
-        }
-        // Assumindo que o seu "plugin" envia eventos de teclado/mouse/foco
-        if (['keyboard', 'mouse', 'focus', 'pause'].includes(eventType.toLowerCase())) {
-            return 'log-plugin'; // Amarelo para Plugins/Eventos
-        }
-        return 'log-default'; // Cor padrão (branca/cinza)
-    }
-	
-	// Função auxiliar para determinar a classe de cor
-	    function getMessageClass(eventType) {
-	        // 1. ROXO para eventos de Visão (ArgusVision)
-	        if (eventType.toLowerCase() === 'vision') {
-	            return 'log-vision'; 
-	        }
-	        // 2. AMARELO para eventos do Plugin (Teclado, Mouse, Foco, Pausa)
-	        if (['keyboard', 'mouse', 'focus', 'pause'].includes(eventType.toLowerCase())) {
-	            return 'log-plugin'; 
-	        }
-	        // 3. Padrão (Neutro)
-	        return 'log-default'; 
-	    }
 
     function createUserCard(event) {
       const element = document.createElement('div');
       element.className = 'user-card active';
+
       element.innerHTML = `
         <div class="header-info">
-            <div class="user-name">	
-                <a href="/student.html?exam=${encodeURIComponent(event.exam)}&student=${encodeURIComponent(event.student)}" target="_blank" title="Ver Detalhes">
-                    ${event.student || 'Anônimo'}
-                </a>
-            </div>
-            <div class="indicator"></div>
+          <div class="user-name">
+            <a href="/student.html?exam=${encodeURIComponent(event.exam)}&student=${encodeURIComponent(event.student)}" target="_blank">
+              ${event.student || 'Anônimo'}
+            </a>
+          </div>
+          <div class="indicator"></div>
+		  <div style="display:flex; gap:12px; margin-top:10px;">
+			<span class="plugin-status offline">PLUGIN</span>
+			<span class="vision-status offline">VISION</span>
+		  </div>
         </div>
-        <div class="exam-name">${event.exam || 'Desconhecido'}</div>
-        <div class="status">
-          <span class="status-type">Último Evento: N/A</span>
-        </div>
+        <div class="exam-name">ID: ${event.exam || 'Desconhecido'}</div>
+        <span class="status-type">ONLINE</span>
         <div class="event-log"></div>
+		
+		<img class="vision-frame" style="display:none;" />
       `;
-      return { element, lastUpdate: Date.now() };
-    }
+
+	  // 🔴 BOTÃO ENCERRAR PROVA
+	  const shutdownBtn = document.createElement('button');
+	  	  shutdownBtn.textContent = 'Encerrar Prova';
+	  	  shutdownBtn.style.marginTop = '10px';
+	  	  shutdownBtn.style.background = 'var(--color-red)';
+	  	  shutdownBtn.style.color = '#fff';
+	  	  shutdownBtn.style.border = 'none';
+	  	  shutdownBtn.style.padding = '8px';
+	  	  shutdownBtn.style.borderRadius = '6px';
+	  	  shutdownBtn.style.cursor = 'pointer';
+
+	  	  shutdownBtn.onclick = () => {
+	  	    if (confirm(`Encerrar a prova de ${event.student}?`)) {
+	  	      shutdownStudent(event.student);
+	  	    }
+	  	  };
+
+	  	  element.appendChild(shutdownBtn);
+
+      const now = Date.now();
+      return {
+        element,
+        lastPlugin: now,
+        lastVision: now,
+        lastFrame: null
+      };
+}
+
+	function shutdownStudent(student) {
+	  fetch(`/api/command/shutdown/${encodeURIComponent(student)}`, {
+	    method: 'POST'
+	  })
+	  .then(() => {
+	    alert(`Comando de shutdown enviado para ${student}`);
+	  })
+	  .catch(err => {
+	    alert('Erro ao enviar comando');
+	    console.error(err);
+	  });
+	}
 
     function updateUserCard(card, event) {
-      const el = card.element;
-	  el.classList.add('active');
-      el.classList.remove('inactive');
+      const log = card.element.querySelector('.event-log');
+      const time = new Date(event.timestamp).toLocaleTimeString();
+      const action = event.action || event.type || 'UNKNOWN';
 
-      // 1. Atualiza Log de Eventos
-      const log = el.querySelector('.event-log');
-	  const msg = `[${new Date().toLocaleTimeString()}] ${event.type} (${event.action || 'N/A'})`;
-	  
-	  const msgElement = document.createElement('span');
-	  msgElement.className = `log-message ${getMessageClass(event.type)}`;
-	  msgElement.textContent = msg;
+      const msg = `[${time}] ${action}`;
+      const span = document.createElement('span');
+      span.className = `log-message ${getMessageClass(event)}`;
+      span.textContent = msg;
 
-	  log.prepend(msgElement);
-	  
-      // Mantém só os últimos 8 logs
-      if (log.children.length > 8) {
-        log.removeChild(log.lastChild);
-      }
-
-      // 2. Renderização de Nível de Alerta
-	  el.classList.remove('green', 'yellow', 'red');
-	    el.classList.add(event.level || 'green');
-
-	    const statusTypeEl = el.querySelector('.status-type');
-	    statusTypeEl.textContent = `Último Evento: ${event.type} | Nível: ${event.level.toUpperCase()}`;
-        
-        statusTypeEl.style.color = 
-          event.level === 'red' ? 'var(--color-red)' :
-          event.level === 'yellow' ? 'var(--color-yellow)' :
-          'var(--color-green)';
-		  
-      // 3. Atualiza o tempo da última atividade
-      card.lastUpdate = Date.now();
+      log.prepend(span);
+      if (log.children.length > 20) log.removeChild(log.lastChild);
     }
 
-    // Checa inatividade periodicamente
+    function getMessageClass(event) {
+      switch (event.type) {
+		case 'vision_frame': return 'log-vision-frame';
+        case 'vision': return 'log-vision';
+        case 'keyboard':
+        case 'shortcut': return 'log-keyboard';
+        case 'focus': return 'log-focus';
+        default: return 'log-default';
+      }
+    }
+
+    // 🔹 CONTROLE DE ONLINE / OFFLINE
     setInterval(() => {
       const now = Date.now();
+
       Object.values(users).forEach(card => {
-        const elapsed = now - card.lastUpdate;
+        const pluginOnline = now - card.lastPlugin < PLUGIN_TIMEOUT;
+        const visionOnline = now - card.lastVision < VISION_TIMEOUT;
+
         const el = card.element;
-        if (elapsed > INACTIVE_TIMEOUT && !el.classList.contains('inactive')) {
-          el.classList.remove('active');
+        const status = el.querySelector('.status-type');
+
+		const pluginEl = el.querySelector('.plugin-status');
+		const visionEl = el.querySelector('.vision-status');
+
+		pluginEl.className = `plugin-status ${pluginOnline ? 'online' : 'offline'}`;
+		visionEl.className = `vision-status ${visionOnline ? 'online' : 'offline'}`;
+
+        if (!pluginOnline && !visionOnline) {
           el.classList.add('inactive');
-          el.querySelector('.status-type').textContent = 'DESCONECTADO';
-          el.querySelector('.status-type').style.color = 'var(--color-red)';
+          el.classList.remove('active');
+          status.textContent = 'OFFLINE';
+          status.style.color = 'var(--color-red)';
+        } else {
+          el.classList.add('active');
+          el.classList.remove('inactive');
+
+          if (!visionOnline) {
+            status.textContent = 'VISION OFFLINE';
+            status.style.color = 'var(--color-yellow)';
+          } else if (!pluginOnline) {
+            status.textContent = 'PLUGIN OFFLINE';
+            status.style.color = 'var(--color-yellow)';
+          } else {
+            status.textContent = 'ONLINE';
+            status.style.color = 'var(--color-green)';
+          }
         }
       });
-    }, 2000);
+    }, 1000);
   </script>
 </body>
 </html>
