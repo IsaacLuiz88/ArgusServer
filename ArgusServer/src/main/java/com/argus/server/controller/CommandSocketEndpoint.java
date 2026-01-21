@@ -35,7 +35,7 @@ public class CommandSocketEndpoint {
 
     @OnMessage
     public void onMessage(String msg, @PathParam("student") String student) {
-    	if (msg.contains("SHUTDOWN_OK")) {
+    	if (msg.contains("\"cmd\":\"SHUTDOWN_OK\"")) {
             try {
                 HttpClient.newHttpClient()
                     .send(
@@ -56,3 +56,4 @@ public class CommandSocketEndpoint {
     }
 
 }
+
