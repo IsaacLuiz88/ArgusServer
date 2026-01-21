@@ -1,11 +1,8 @@
----
-
 # 📘 README — ArgusServer
 
 ## ArgusServer — Backend de Monitoramento e Controle de Provas
 
 O **ArgusServer** é o **backend central** do ecossistema **Argus**, responsável por **receber, processar, armazenar e transmitir em tempo real** eventos de monitoramento de alunos durante provas práticas.
-
 Ele integra:
 
 * **Eventos comportamentais** (teclado, foco, atalhos)
