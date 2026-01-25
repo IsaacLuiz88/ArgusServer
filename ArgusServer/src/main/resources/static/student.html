@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Argus - Detalhes</title>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #050507;
+      --neon-purple: #bc13fe;
+      --card-bg: #121217;
+      --text-main: #e0e0e0;
+      --border-glow: rgba(188, 19, 254, 0.3);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-main);
+      padding: 40px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .header-box {
+      background: linear-gradient(135deg, #1a1a2e 0%, #0a0a0c 100%);
+      padding: 30px;
+      border-radius: 20px;
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      margin-bottom: 30px;
+    }
+
+    h2 {
+      color: var(--neon-purple);
+      font-weight: 300;
+      margin-bottom: 10px;
+    }
+
+    #events {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 20px;
+      border: 1px solid #222;
+      height: 60vh;
+      overflow-y: auto;
+    }
+
+    .evt {
+      padding: 12px 20px;
+      border-bottom: 1px solid #1f1f1f;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .event-vision {
+      color: var(--neon-purple);
+      border-left: 3px solid var(--neon-purple);
+      background: rgba(188, 19, 254, 0.05);
+    }
+
+    .event-keyboard {
+      color: #0a7c86;
+      border-left: 3px solid #0a7c86;
+      background: rgba(10, 124, 134, 0.08);
+    }
+
+    .event-focus {
+      color: #ff9f1c;
+      border-left: 3px solid #ff9f1c;
+      background: rgba(255, 159, 28, 0.08);
+    }
+
+    .event-vision-frame {
+      color: #00ff9c;
+      border-left: 3px solid #00ff9c;
+      background: rgba(0, 255, 156, 0.08);
+      box-shadow: inset 0 0 10px rgba(0, 255, 156, 0.25);
+      font-weight: 600;
+    }
+
+    .evt-time {
+      color: #666;
+      font-size: 0.8rem;
+      font-family: monospace;
+    }
+
+    .evt-message {
+      flex-grow: 1;
+      font-weight: 500;
+    }
+
+    .evt-vision {
+      border-left: 3px solid var(--neon-purple);
+      background: rgba(188, 19, 254, 0.05);
+    }
+
+    .evt-plugin {
+      border-left: 3px solid #00d2ff;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 10px;
+    }
+  </style>
+  <link rel="icon" type="image/png" href="icons/Argus_Mascote_20250825_2025_16x24.png">
+</head>
+
+<body>
+  <div class="container">
+    <div class="header-box">
+      <h2>👤 Monitoramento Individual</h2>
+      <p>Aluno: <strong id="studentName"></strong></p>
+      <p>Prova: <span id="examName"></span></p>
+    </div>
+
+    <div style="display:flex; gap:25px;">
+
+      <!-- FRAME GRANDE -->
+      <div style="flex:1;">
+        <img id="vision-frame"
+          style="width:100%; border-radius:16px; display:none; border:2px solid var(--neon-purple);" />
+      </div>
+
+      <!-- LOG -->
+      <div id="events" style="flex:1;"></div>
+
+    </div>
+  </div>
+
+  <script>
+    const EVENTOS_PT = {
+      "NO_FACE": "SEM ROSTO",
+      "FACE_CENTER": "ROSTO_CENTRO",
+      "FACE_LEFT": "ROSTO_ESQUERDA",
+      "FACE_RIGHT": "ROSTO_DIREITA",
+      "FACE_UP": "ROSTO_CIMA",
+      "FACE_DOWN": "ROSTO_BAIXO",
+      "ROSTO_CENTRO": "ROSTO_CENTRO",
+      "ROSTO_ESQUERDA": "ROSTO_ESQUERDA",
+      "ROSTO_DIREITA": "ROSTO_DIREITA",
+      "ROSTO_CIMA": "ROSTO_CIMA",
+      "ROSTO_BAIXO": "ROSTO_BAIXO"
+    };
+
+	let sessionActive = true;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const student = urlParams.get('student');
+    const exam = urlParams.get('exam');
+    document.getElementById('studentName').textContent = student;
+    document.getElementById('examName').textContent = exam;
+
+    const socket = new SockJS('/ws');
+    const client = Stomp.over(socket);
+    client.debug = null;
+
+    client.connect({}, function (frame) {
+      client.subscribe('/topic/events', function (message) {
+		if (!sessionActive) return;
+        const event = JSON.parse(message.body);
+
+		if (
+		  event.type === 'SESSION' && event.action === 'ENDED' &&
+		  event.student === student && event.exam === exam) {
+		  sessionActive = false;
+
+		  const eventsDiv = document.getElementById('events');
+		  eventsDiv.innerHTML = `
+		    <div style="
+		      text-align:center;
+		      padding:40px;
+		      color:#ff3131;
+		      font-size:1.3rem;
+		      font-weight:600;
+		    ">
+		      🚫 PROVA ENCERRADA<br/>
+		      <span style="font-size:0.9rem; color:#999">
+		        Monitoramento finalizado pelo servidor
+		      </span>
+		    </div>
+		  `;
+
+		  const frame = document.getElementById('vision-frame');
+		  frame.style.display = 'none';
+		  frame.src = '';
+
+		  // 🔌 encerra websocket
+		  client.disconnect();
+
+		  return;
+		}
+
+        // 🔹 Atualiza frame apenas para este aluno
+		if (
+		  sessionActive &&
+		  event.type === 'vision_frame' && event.student === student && event.exam === exam) {
+          const img = document.getElementById('vision-frame');
+          img.src = `data:image/jpeg;base64,${event.image}`;
+          img.style.display = 'block';
+        }
+//🚫 Prova encerrada
+        if (event.type === 'heartbeat') return;
+
+        // 🔹 Ignora eventos de movimento
+        if (event.action && event.action.startsWith('MOTION')) return;
+
+        if (event.student !== student || event.exam !== exam) return;
+
+        // 🔹 Adiciona evento ao log
+        if (event.student === student && event.exam === exam) {
+          const el = document.createElement('div');
+          const time = new Date(event.timestamp).toLocaleTimeString();
+          const actionOriginal = event.action || event.type || 'UNKNOWN';
+          const action = EVENTOS_PT[actionOriginal] || actionOriginal;
+
+          el.className = `evt ${getEventClass(event)}`;
+          el.innerHTML = `
+            <span class="evt-time">${time}</span>
+            <span class="evt-message">${action}</span>
+          `;
+
+          document.getElementById('events').prepend(el);
+        }
+      });
+    });
+
+    function getEventClass(event) {
+      if (event.type === 'vision_frame') return 'event-vision-frame';
+      switch (event.type) {
+        case 'vision': return 'event-vision';
+        case 'keyboard':
+        case 'shortcut': return 'event-keyboard';
+        case 'focus': return 'event-focus';
+        default: return '';
+      }
+    }
+  </script>
+</body>
+
+</html>
