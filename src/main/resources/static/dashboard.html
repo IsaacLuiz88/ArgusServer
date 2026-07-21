@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Argus Dashboard - Realtime</title>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  <style>
+    /* ======= NEON PURPLE THEME ======= */
+    :root {
+      --bg-deep: #0a0a0c;
+      --card-bg: rgba(30, 30, 35, 0.7);
+      --neon-purple: #bc13fe;
+      --neon-blue: #00d2ff;
+      --color-green: #39ff14;
+      /* Neon Green */
+      --color-yellow: #f0f000;
+      --color-red: #ff3131;
+      --text-main: #e0e0e0;
+      --text-dim: #a0a0a0;
+      --border-color: rgba(188, 19, 254, 0.2);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-deep);
+      background-image: radial-gradient(circle at 50% -20%, #25103f 0%, #0a0a0c 80%);
+      color: var(--text-main);
+      padding: 30px;
+      min-height: 100vh;
+    }
+
+    h2 {
+      font-weight: 300;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--neon-purple);
+      text-shadow: 0 0 10px rgba(188, 19, 254, 0.5);
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    /* ======= GRID ======= */
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 25px;
+    }
+
+    /* ======= NEON CARDS ======= */
+    .user-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+
+    .user-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--neon-purple);
+      opacity: 0.5;
+    }
+
+    .user-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--neon-purple);
+      box-shadow: 0 10px 30px rgba(188, 19, 254, 0.15);
+    }
+
+    .header-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 15px;
+    }
+
+    .user-name a {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+      transition: 0.2s;
+    }
+
+    .user-name a:hover {
+      color: var(--neon-purple);
+    }
+
+    .exam-name {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 15px;
+      font-style: italic;
+    }
+
+    .ip-address {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 15px;
+      font-style: italic;
+    }
+
+    .indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .active .indicator {
+      color: var(--color-green);
+      background-color: var(--color-green);
+    }
+
+    .inactive .indicator {
+      color: var(--color-red);
+      background-color: var(--color-red);
+      opacity: 0.5;
+    }
+
+    .online {
+      color: var(--color-green);
+      font-weight: bold;
+    }
+
+    .offline {
+      color: var(--color-red);
+      font-weight: bold;
+    }
+
+    /* ======= LOG AREA ======= */
+    .event-log {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.75rem;
+      height: 120px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .log-message {
+      display: block;
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    .log-vision {
+      color: var(--neon-purple);
+      text-shadow: 0 0 5px rgba(188, 19, 254, 0.3);
+    }
+
+    .log-keyboard {
+      color: var(--neon-blue);
+    }
+
+    .log-focus {
+      color: #ff9f1c;
+      text-shadow: 0 0 4px rgba(255, 159, 28, 0.4);
+    }
+
+    .log-default {
+      color: var(--text-dim);
+    }
+
+    .status-type {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .vision-frame {
+      width: 100%;
+      margin-top: 10px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .log-vision-frame {
+      color: #00ff9c;
+      text-shadow: 0 0 5px rgba(0, 255, 156, 0.4);
+    }
+
+    /* Scrollbar minimalista */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .log-error-neon {
+      color: #ff3131;
+      font-weight: bold;
+      text-shadow: 0 0 8px rgba(255, 49, 49, 0.8);
+      border-left: 3px solid #ff3131;
+      padding-left: 5px !important;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--neon-purple);
+      border-radius: 10px;
+    }
+  </style>
+  <link rel="icon" type="image/png" href="icons/Argus_Mascote_20250825_2025_16x24.png">
+</head>
+
+<body>
+
+  <h2><span style="color:var(--neon-purple)">●</span> Argus Realtime</h2>
+
+  <button onclick="startExam()" style="margin-bottom:20px; background:green; color:white; padding:10px;">
+    Iniciar Prova
+  </button>
+
+  <button onclick="shutdownAll()" style="margin-bottom:20px; background:red; color:white; padding:10px;">
+    Encerrar todas as provas
+  </button>
+
+  <div id="dashboard" class="dashboard"></div>
+
+  <script>
+    const EVENTOS_PT = {
+      "NO_FACE": "SEM ROSTO",
+      "FACE_CENTER": "ROSTO_CENTRO",
+      "FACE_LEFT": "ROSTO_ESQUERDA",
+      "FACE_RIGHT": "ROSTO_DIREITA",
+      "FACE_UP": "ROSTO_CIMA",
+      "FACE_DOWN": "ROSTO_BAIXO",
+      "ROSTO_CENTRO": "ROSTO_CENTRO",
+      "ROSTO_ESQUERDA": "ROSTO_ESQUERDA",
+      "ROSTO_DIREITA": "ROSTO_DIREITA",
+      "ROSTO_CIMA": "ROSTO_CIMA",
+      "ROSTO_BAIXO": "ROSTO_BAIXO",
+      "CTRL_V_COMMAND": "COPIAR/COLAR (Atalho/Menu)",
+      "Inserção_de_Texto_Grande": "ALERTA: Bloco de texto inserido",
+      "Insercao_Copia_Cola": "SUSPEITA DE PLÁGIO"
+    };
+
+    function shutdownAll() {
+      if (!confirm("Encerrar TODAS as provas?")) return;
+
+      fetch('/api/command/shutdown-all', { method: 'POST' })
+        .then(() => alert("Encerramento global enviado"))
+        .catch(err => console.error(err));}
+
+    const socket = new SockJS('/ws');
+    const client = Stomp.over(socket);
+    client.debug = null;
+
+    const dashboard = document.getElementById('dashboard');
+    const users = {};
+    const examStarts = {};
+
+    client.connect({}, function () {
+      client.subscribe('/topic/events', msg => {
+        const event = JSON.parse(msg.body);
+        console.log("Evento recebido:", event);
+
+        // 🔴 Sessão encerrada
+        if (event.type === 'SESSION' && event.action === 'ENDED') {
+		  markSessionEnded(event.session);
+		  return;
+        }
+
+        if (event.type === 'EXAM' && event.action === 'STARTED') {
+          examStarts[event.exam] = event.examStart;
+          Object.values(users).forEach(card => {
+            if (card.element.dataset.exam === event.exam) {
+              card.examStart = event.examStart;
+            }
+          });
+          return;
+        }
+
+        // 🔹 Ignora eventos de movimento
+        if (event.action && event.action.startsWith('MOTION')) { return; }
+
+        // 🔑 DEFINIÇÃO ÚNICA DA CHAVE
+        const sessionKey = event.session || event.sessionUuid;
+		if (!sessionKey) return;
+		let card = users[sessionKey];
+
+        if (!card) {
+          card = createUserCard(event);
+          users[sessionKey] = card;
+          dashboard.appendChild(card.element);
+        }
+
+		if (!card) return;// Se mesmo assim não achou/criou, ignora
+
+        // Se o card já foi encerrado, ignora novos eventos
+        if (card.element.dataset.ended === "true") return;
+
+        // 2️⃣ HEARTBEAT
+        if (event.type?.toLowerCase() === 'heartbeat') {
+			card.lastHeartbeat = Date.now();
+			card.lastPlugin = Date.now();
+        }
+
+        const now = Date.now();
+        const type = event.type?.toLowerCase();
+
+		// Se receber qualquer coisa do plugin, ele está vivo
+		card.lastPlugin = now;
+
+		if (type === 'heartbeat') {card.lastHeartbeat = now;}
+
+        // Atividade real
+        if (['vision', 'vision_frame'].includes(type)) card.lastVision = now;
+
+        // Frame Base64
+        if (event.type === 'vision_frame') {
+          const img = card.element.querySelector('.vision-frame');
+          if (img) {
+            img.src = `data:image/jpeg;base64,${event.image}`;
+            img.style.display = 'block';
+          }
+        }
+
+        // Sinais técnicos (heartbeat, plugin_scan de rotina, cada frame da webcam)
+        // já atualizaram o card acima - não interessam ao professor como linha de log.
+        // plugin_suspect (alerta de IA) NÃO entra aqui, continua visível.
+        if (['heartbeat', 'plugin_scan', 'vision_frame'].includes(type)) { return; }
+
+        updateUserCard(card, event);
+      });
+    });
+
+    function createUserCard(event) {
+      const sessionKey = event.session || event.sessionUuid || "sem-sessao";
+      const element = document.createElement('div');
+      element.dataset.student = event.student;
+      element.className = 'user-card active';
+
+      // Identificadores únicos para o DOM
+      element.dataset.student = event.student;
+      element.dataset.exam = event.exam;
+      element.dataset.session = sessionKey;
+      element.dataset.ended = "false";
+
+      element.innerHTML = `
+        <div class="header-info">
+          <div class="user-name">
+			<a href="/student.html?student=${encodeURIComponent(event.student)}&exam=${encodeURIComponent(event.exam)}&session=${encodeURIComponent(sessionKey)}" target="_blank">  
+				${event.student || 'Anônimo'}
+            </a>
+          </div>
+          <div class="indicator"></div>
+
+		  <div style="display:flex; gap:12px; margin-top:10px;">
+			<span class="plugin-status offline">PLUGIN</span>
+			<span class="vision-status offline">VISION</span>
+		  </div>
+      </div>
+      <div class="exam-name">ID: ${event.exam || 'Desconhecido'}</div>
+      <span class="status-type">ONLINE</span>
+	  <div class="ip-address">🌐 IP: <span class="ip-address">${event.ip || '...'}</span></div>
+	  <div class="timers">
+	    <div class="global-timer">⏱ Prova: --:--</div>
+	    <div class="student-timer">👤 Aluno: --:--</div>
+	  </div>
+      <div class="event-log"></div>
+		<img class="vision-frame" style="display:none;" />`;
+
+      // 🔴 BOTÃO ENCERRAR PROVA
+      const shutdownBtn = document.createElement('button');
+      shutdownBtn.textContent = 'Encerrar Prova';
+      shutdownBtn.style.marginTop = '10px';
+      shutdownBtn.style.background = 'var(--color-red)';
+      shutdownBtn.style.color = '#fff';
+      shutdownBtn.style.border = 'none';
+      shutdownBtn.style.padding = '8px';
+      shutdownBtn.style.borderRadius = '6px';
+      shutdownBtn.style.cursor = 'pointer';
+
+      shutdownBtn.onclick = () => {
+        if (confirm(`Encerrar a prova de ${event.student}?`)) {
+          //shutdownStudent(event.student);
+          fetch(`/api/command/shutdown/${event.student}`, { method: 'POST' });
+        }
+      };
+
+      element.appendChild(shutdownBtn);
+
+      const now = Date.now();
+      return {
+        element,
+        lastPlugin: now,
+        lastHeartbeat: now,
+        lastVision: now,
+        examStart: examStarts[event.exam] || event.examStart || null,
+        studentStart: event.studentStart ? new Date(event.studentStart).getTime() : Date.now(),
+        lastFrame: null
+      };
+    }
+
+    function shutdownStudent(student) {
+      fetch(`/api/command/shutdown/${encodeURIComponent(student)}`, {
+        method: 'POST'
+      }).then(() => {alert(`Comando de shutdown enviado para ${student}`);
+        }).catch(err => {
+          alert('Erro ao enviar comando');
+          console.error(err);
+        });
+    }
+
+    function updateUserCard(card, event) {
+      const log = card.element.querySelector('.event-log');
+      const time = new Date(event.timestamp).toLocaleTimeString();
+      const actionOriginal = event.action || event.type || 'UNKNOWN';
+      const action = EVENTOS_PT[actionOriginal] || actionOriginal;
+
+      // Fallback só com o horário DESSA prova especificamente - nunca de outra
+      // prova que por acaso já esteja ativa (senão o timer de uma prova nova
+      // "herda" visualmente o horário de início de uma prova diferente).
+      if (!card.examStart && examStarts[event.exam]) {card.examStart = examStarts[event.exam];}
+
+      const ipEl = card.element.querySelector('.ip-address');
+      if (ipEl && event.ip) {ipEl.textContent = event.ip;}
+
+      const msg = `[${time}] ${action}`;
+      const span = document.createElement('span');
+      span.className = `log-message ${getMessageClass(event)}`;
+      span.textContent = msg;
+
+      log.prepend(span);
+      if (log.children.length > 20) log.removeChild(log.lastChild);
+    }
+
+    function getMessageClass(event) {
+      if (event.type === 'plugin_suspect') return 'log-error-neon';
+      switch (event.type) {
+        case 'vision_frame': return 'log-vision-frame';
+        case 'vision': return 'log-vision';
+        case 'keyboard':
+        case 'shortcut': return 'log-keyboard';
+        case 'focus': return 'log-focus';
+        default: return 'log-default';
+      }
+    }
+
+    //Função que finaliza o card
+	  function markSessionEnded(session){
+		console.log("Encerrando session:", session);
+		const card = document.querySelector(
+		  `[data-session="${session}"]:not([data-ended="true"])`
+		);
+		console.log("Card encontrado:", card);
+      if (!card) return;
+
+      card.dataset.ended = "true";
+      card.classList.remove('active');
+      card.classList.add('inactive');
+
+      const btn = card.querySelector('button');
+      if (btn) btn.remove();
+
+      const status = card.querySelector('.status-type');
+      status.textContent = 'PROVA ENCERRADA';
+      status.style.color = 'var(--color-red)';
+    }
+
+    function getColor(status) {
+      if (status === "green") return "var(--color-green)";
+      if (status === "yellow") return "var(--color-yellow)";
+      return "var(--color-red)";}
+
+    function getPluginStatus(pluginDiff, heartbeatDiff) {
+      if (heartbeatDiff > 15000) return "red";// Plugin não manda sinal há 15s (Caiu/Fechou)
+      if (pluginDiff > 60000) return "yellow";// Plugin vivo, mas sem atividade há 1 min (Inativo)
+      return "green";// Plugin vivo e com atividade recente
+    }
+
+    function getVisionStatus(visionDiff) {
+      if (visionDiff > 20000) return "red";// Câmera parou de mandar frames
+      if (visionDiff > 10000) return "yellow";// Instabilidade no envio
+      return "green";
+    }
+
+    // 🔹 CONTROLE DE ONLINE / OFFLINE
+    setInterval(() => {
+      const now = Date.now();
+
+      Object.values(users).forEach(card => {
+        const el = card.element;
+        if (el.dataset.ended === "true") return;
+
+        // --- Timers ---
+        const globalTimer = el.querySelector('.global-timer');
+        const studentTimer = el.querySelector('.student-timer');
+        if (card.examStart && globalTimer) globalTimer.textContent = `⏱ Prova: ${formatTime(now - card.examStart)}`;
+        if (card.studentStart && studentTimer) studentTimer.textContent = `👤 Aluno: ${formatTime(now - card.studentStart)}`;
+
+        // --- Cálculos de Diferença ---
+        const pluginDiff = now - (card.lastPlugin || 0);
+        const heartbeatDiff = now - (card.lastHeartbeat || 0);
+        const visionDiff = now - (card.lastVision || 0);
+
+        // --- Determinação dos Status (red, yellow, green) ---
+        const pluginStatus = getPluginStatus(pluginDiff, heartbeatDiff);
+        const visionStatus = getVisionStatus(visionDiff);
+
+        // --- Seleção dos Elementos Visuais ---
+        const pluginEl = el.querySelector('.plugin-status');
+        const visionEl = el.querySelector('.vision-status');
+        const statusText = el.querySelector('.status-type');
+        const indicator = el.querySelector('.indicator');
+
+        // 1. FEEDBACK INDIVIDUAL (As flags pequenas PLUGIN e VISION)
+        pluginEl.style.color = getColor(pluginStatus);
+        visionEl.style.color = getColor(visionStatus);
+
+        // Lógica do texto central (ONLINE / INATIVO / OFFLINE)	
+        function getStatusLabel(status) {
+          if (status === "green") return "ATIVO";
+          if (status === "yellow") return "INATIVO";
+          return "OFFLINE";
+        }
+
+        // 3. LÓGICA DE CORES INDIVIDUAIS NO TEXTO CENTRAL
+        // Usamos innerHTML para que cada parte tenha sua cor própria
+        statusText.innerHTML = `
+          <span style="color:${getColor(pluginStatus)}">PLUGIN: ${getStatusLabel(pluginStatus)}</span> 
+          <span style="color:var(--text-dim); margin: 0 5px;">|</span>
+          <span style="color:${getColor(visionStatus)}">VISION: ${getStatusLabel(visionStatus)}</span>
+        `;
+
+        // 4. COR DA BOLINHA NEON
+        // Vermelho = os DOIS sinais caíram (plugin e vision), ou seja, tudo caído.
+        // Se só um dos dois está com problema, é amarelo (atenção), não vermelho.
+        if (pluginStatus === "red" && visionStatus === "red") {
+          indicator.style.color = 'var(--color-red)';
+          indicator.style.backgroundColor = 'var(--color-red)';
+        } else if (pluginStatus === "green" && visionStatus === "green") {
+          indicator.style.color = 'var(--color-green)';
+          indicator.style.backgroundColor = 'var(--color-green)';
+        } else {
+          indicator.style.color = 'var(--color-yellow)';
+          indicator.style.backgroundColor = 'var(--color-yellow)';
+        }
+      });
+    }, 1000);
+
+    function formatTime(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      return `${min}:${sec.toString().padStart(2, '0')}`;
+    }
+
+    function startExam() {
+      const exam = prompt("Digite o código da prova:");
+      if (!exam) return;
+
+      fetch(`/api/session/exam/start/${encodeURIComponent(exam)}`, {
+        method: 'POST'
+      })
+        .then(() => alert("Prova iniciada"))
+        .catch(err => console.error(err));
+    }
+
+    window.addEventListener('beforeunload', function (e) {
+      e.preventDefault();
+      e.returnValue = 'Tem certeza que deseja sair?';
+    });
+  </script>
+</body>
+
+</html>
