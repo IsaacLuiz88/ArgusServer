@@ -13,6 +13,7 @@ import com.argus.server.service.StudentService;
 
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -27,23 +28,34 @@ public class SessionController {
     private final ExamService examService;
     private final SessionService sessionService;
     private final SimpMessagingTemplate ws;
+    private final CommandSocketHandler commandSocketHandler;
 
     public SessionController(
             StudentService studentService,
             ExamService examService,
             SessionService sessionService,
-            SimpMessagingTemplate ws
+            SimpMessagingTemplate ws,
+            CommandSocketHandler commandSocketHandler
         ) {
             this.studentService = studentService;
             this.examService = examService;
             this.sessionService = sessionService;
             this.ws = ws;
+            this.commandSocketHandler = commandSocketHandler;
         }
 
     @PostMapping("/start")
     public SessionDTO start(@RequestBody SessionDTO req) {
         StudentEntity student = studentService.findOrCreate(req.student());
         ExamEntity exam = examService.findOrCreate(req.exam());
+
+        if (exam.isClosed()) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Esta prova já foi encerrada e não aceita novas sessões."
+            );
+        }
+
         SessionEntity s = sessionService.findOrCreate(student, exam);
 
         Map<String, Object> startedPayload = new HashMap<>();
@@ -145,6 +157,37 @@ public class SessionController {
             "action", "STARTED",
             "exam", exam,
             "examStart", examStartMillis
+        ));
+    }
+
+    // Encerramento DEFINITIVO da prova: diferente do "Encerrar todas as provas"
+    // do CommandController (que só finaliza sessões ativas), isto também marca
+    // o código da prova como fechado, para que /api/session/start rejeite
+    // qualquer tentativa futura de reabrir uma sessão nela (ver método start acima).
+    @PostMapping("/exam/close/{exam}")
+    public void closeExam(@PathVariable String exam) {
+        examService.closeExam(exam);
+
+        List<SessionEntity> sessions = sessionService.findAllActive().stream()
+            .filter(s -> s.getExam().getCode().equals(exam))
+            .toList();
+
+        sessions.forEach(s -> {
+            sessionService.end(s);
+            commandSocketHandler.sendShutdown(s.getSessionUuid());
+            ws.convertAndSend("/topic/events", Map.of(
+                "type", "SESSION",
+                "action", "ENDED",
+                "student", s.getStudent().getName(),
+                "exam", s.getExam().getCode(),
+                "session", s.getSessionUuid()
+            ));
+        });
+
+        ws.convertAndSend("/topic/events", Map.of(
+            "type", "EXAM",
+            "action", "CLOSED",
+            "exam", exam
         ));
     }
 }

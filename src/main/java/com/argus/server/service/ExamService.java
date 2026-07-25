@@ -35,4 +35,12 @@ public class ExamService {
         exam.setStartedAt(LocalDateTime.now());
         return repo.save(exam);
     }
+
+    // Encerra a prova definitivamente: nenhuma nova sessão pode ser criada
+    // para este código depois disso (ver SessionController.start).
+    public ExamEntity closeExam(String code) {
+        ExamEntity exam = findOrCreate(code);
+        exam.setEndedAt(LocalDateTime.now());
+        return repo.save(exam);
+    }
 }

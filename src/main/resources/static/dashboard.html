@@ -237,6 +237,10 @@
     Encerrar todas as provas
   </button>
 
+  <button onclick="closeExam()" style="margin-bottom:20px; background:#7a0000; color:white; padding:10px;">
+    Encerrar prova definitivamente
+  </button>
+
   <div id="dashboard" class="dashboard"></div>
 
   <script>
@@ -263,6 +267,19 @@
       fetch('/api/command/shutdown-all', { method: 'POST' })
         .then(() => alert("Encerramento global enviado"))
         .catch(err => console.error(err));}
+
+    // Diferente do "Encerrar todas as provas": isso fecha o CÓDIGO da prova
+    // de vez, então ninguém mais consegue iniciar uma sessão nova nela depois
+    // (mesmo que o código seja reaproveitado dias/semanas depois).
+    function closeExam() {
+      const exam = prompt("Digite o código da prova a encerrar DEFINITIVAMENTE:");
+      if (!exam) return;
+      if (!confirm(`Encerrar a prova "${exam}" definitivamente? Nenhum aluno vai conseguir iniciar uma sessão nova nela depois disso.`)) return;
+
+      fetch(`/api/session/exam/close/${encodeURIComponent(exam)}`, { method: 'POST' })
+        .then(() => alert("Prova encerrada definitivamente"))
+        .catch(err => console.error(err));
+    }
 
     const socket = new SockJS('/ws');
     const client = Stomp.over(socket);
