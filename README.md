@@ -2,14 +2,15 @@
 
 ![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.2-6DB33F?logo=springboot&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-live%20activity-DC382D?logo=redis&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-local-4479A1?logo=mysql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-opcional-DC382D?logo=redis&logoColor=white)
 ![WebSocket](https://img.shields.io/badge/WebSocket-STOMP%20%2B%20raw-informational)
 ![TCC](https://img.shields.io/badge/projeto-TCC-blueviolet)
 
 > Se o [Argus](../Argus) é o olho no computador do aluno e o [ArgusVision](../ArgusVision) é o olho na webcam, o **ArgusServer** é o cérebro que junta tudo, lembra de tudo, e mostra tudo pro professor em tempo real.
 
-O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comportamentais e visuais durante provas práticas, guarda um histórico auditável no MySQL, mantém o estado "ao vivo" de cada aluno no Redis, e transmite tudo em tempo real pra um dashboard web via WebSocket.
+O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comportamentais e visuais durante provas práticas, guarda um histórico auditável (MySQL em desenvolvimento, PostgreSQL/Neon em produção), registra a última atividade de cada aluno no Redis (opcional), e transmite tudo em tempo real pra um dashboard web via WebSocket.
 
 ---
 
@@ -63,7 +64,8 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 | Tipo | Origem | Descrição |
 |---|---|---|
 | `keyboard` | Argus | Ctrl+C / Ctrl+V / Ctrl+X (via comando do Eclipse e via tecla crua) |
-| `Insercao_Copia_Cola` | Argus | Bloco grande de texto colado de uma vez |
+| `Insercao_Copia_Cola` | Argus | Colagem de bloco grande (mais de 50 caracteres na área de transferência) |
+| `Digitacao_Anormalmente_Rapida` | Argus | 50 ou mais teclas de texto em cerca de 500 ms (possível macro) |
 | `focus` | Argus | IDE perdeu ou ganhou foco |
 | `security` | Argus | Marketplace / Install / Update abertos ou acionados |
 | `state` | Argus | Inatividade prolongada, encerramento do plugin |
@@ -133,14 +135,16 @@ Os dois canais convivem de propósito em implementações separadas — misturar
 
 | Onde | Pra quê |
 |---|---|
-| **MySQL** | Histórico completo e auditável — alunos, provas, sessões e eventos. |
-| **Redis** | Grava o timestamp da última atividade de cada sessão (chave `activity:{prova}:{aluno}`). Hoje é só escrita: o método de leitura (`ActivityService.getLastActivity`) existe, mas nada o chama ainda. |
+| **MySQL** (padrão, local) ou **PostgreSQL** (perfil `prod`, Neon) | Histórico completo e auditável — alunos, provas, sessões e eventos. O JSON bruto (`raw`) usa coluna de texto longo nos dois bancos. |
+| **Redis** (opcional) | Grava o timestamp da última atividade de cada sessão (chave `activity:{prova}:{aluno}`). Hoje é só escrita: `ActivityService.getLastActivity` existe, mas nada o chama. Se o Redis estiver fora do ar, um disjuntor desliga as escritas por um tempo e o servidor segue normal. Desligue de vez com `argus.redis.enabled=false`. |
 
 ---
 
 ## Configuração
 
-`src/main/resources/application.properties`:
+### Local (padrão)
+
+`src/main/resources/application.properties` — MySQL na porta **3307** (ajuste à sua instalação), sem segurança, Redis em `localhost:6379`:
 
 ```properties
 server.address=0.0.0.0
@@ -152,11 +156,43 @@ spring.datasource.password=
 
 spring.jpa.hibernate.ddl-auto=update
 
+# Redis (opcional)
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+argus.redis.enabled=true
 ```
 
-> Repare que o MySQL está configurado na porta **3307**, não a 3306 padrão — ajuste conforme sua instalação.
->
-> O Redis, por outro lado, **não é configurável por propriedades**: `RedisConfig` cria a conexão com os valores padrão (`localhost:6379`). Mesmo o `application.properties` trazendo `spring.redis.*`, essas chaves não têm efeito (no Spring Boot 3 o prefixo seria `spring.data.redis`, e a conexão também não as usa).
+Outras chaves: `argus.event-log-files` (grava um arquivo de log por aluno em `logs/`).
+
+### Produção (Render + Neon)
+
+O perfil `prod` (`application-prod.properties`) usa PostgreSQL, respeita a variável `PORT` do Render e confia no proxy para HTTPS (`server.forward-headers-strategy=framework`). Variáveis de ambiente:
+
+| Variável | Pra quê |
+|---|---|
+| `SPRING_PROFILES_ACTIVE=prod` | já definida no `Dockerfile` |
+| `DB_URL` | `jdbc:postgresql://<host-do-neon>/<banco>?sslmode=require` |
+| `DB_USER` / `DB_PASSWORD` | credenciais do Neon |
+| `ARGUS_CLIENT_KEY` | chave que o plugin/Vision enviam (opcional, ver Segurança) |
+| `ARGUS_PROFESSOR_USER` / `ARGUS_PROFESSOR_PASSWORD` | login do professor (opcional, ver Segurança) |
+| `ARGUS_REDIS_ENABLED=false` | recomendado no Render se não houver Redis |
+
+O `Dockerfile` (multi-stage, Maven + JRE 17) gera o jar executável e sobe com o perfil `prod`. Ele foi escrito mas **não foi construído** durante o desenvolvimento; o jar (`mvn package`, `java -jar target/*.jar`) e o perfil `prod` foram testados contra um PostgreSQL real.
+
+Cuidados no plano gratuito:
+- **Render**: o serviço dorme sem tráfego e demora a acordar; o plugin reconecta sozinho. O disco é efêmero (a pasta `logs/` some a cada deploy).
+- **Neon**: 0,5 GB de armazenamento. Se usar a URL do *pooler*, verifique a compatibilidade com prepared statements do driver.
+
+### Segurança (opcional)
+
+Duas camadas independentes, ambas **desligadas quando a propriedade está vazia**:
+
+| Propriedade | Efeito |
+|---|---|
+| `argus.security.client-key` | Exige o header `X-Argus-Key` em `/api/event`, `/api/session/start`, `/api/session/active` e `/ws-command`. Barra quem não tem o plugin. |
+| `argus.security.professor-user` + `argus.security.professor-password` | Exige HTTP Basic em todo o resto: dashboards, `/api/command`, encerramento de sessão/prova e o `/ws` do dashboard. |
+
+A chave de cliente fica na máquina do aluno, então **não impede um aluno decidido de forjar eventos**; ela só protege as rotas do professor de quem não tem acesso. Use HTTPS (o Render já entrega) para que a senha do professor não trafegue em texto puro.
 
 ---
 
@@ -164,16 +200,16 @@ spring.jpa.hibernate.ddl-auto=update
 
 ### Requisitos
 - Java 17+
-- MySQL rodando (banco `argus_db` é criado/atualizado automaticamente via `ddl-auto=update`)
-- Redis rodando em `localhost:6379`
+- MySQL rodando (banco `argus_db` criado/atualizado via `ddl-auto=update`), ou PostgreSQL com o perfil `prod`
+- Redis é opcional
 
 ### Passos
 ```bash
 mvn spring-boot:run
 ```
-Ou execute a classe `ArgusServerApplication` direto pela IDE.
+Ou execute a classe `ArgusServerApplication` pela IDE. Para gerar o jar: `mvn package` e `java -jar target/<nome>.jar`.
 
-O servidor sobe em `http://localhost:8080` — e o dashboard fica em `http://localhost:8080/dashboard.html`.
+O servidor sobe em `http://localhost:8080` e o dashboard fica em `http://localhost:8080/dashboard.html`.
 
 ---
 
@@ -181,8 +217,12 @@ O servidor sobe em `http://localhost:8080` — e o dashboard fica em `http://loc
 
 - Arquitetura pensada para **múltiplos alunos simultâneos** numa mesma sala.
 - Eventos são imutáveis depois de persistidos — servem como registro de auditoria.
-- Os endpoints não têm autenticação: qualquer máquina que alcance o servidor consegue chamar as rotas de `/api/command` e `/api/session`. Hoje ele deve ser usado apenas em rede controlada (a rede do laboratório).
-- Ponto natural de extensão: autenticação do professor, alertas automáticos, relatórios pós-prova.
+- Por padrão os endpoints **não têm autenticação** (comportamento de laboratório local). Para uso online, ligue as camadas descritas em [Segurança](#segurança-opcional).
+- Os nomes de aluno e prova viram identificadores de sessão só com ASCII seguro, então espaço e acento não quebram a URL do WebSocket.
+- Plugin conectando (ou reconectando) numa sessão já encerrada recebe `shutdown` na hora.
+- Frames da webcam (`vision_frame`) são gravados no banco sem limite de retenção: no plano gratuito do Neon (0,5 GB) isso enche rápido em provas longas.
+- O dashboard não guarda histórico: ao recarregar a página, ele começa vazio até chegarem novos eventos.
+- Ponto natural de extensão: limpeza de frames antigos, histórico ao recarregar o dashboard, relatórios pós-prova.
 
 ---
 
