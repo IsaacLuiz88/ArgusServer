@@ -1,4 +1,4 @@
-# 🖥️ ArgusServer — o Cérebro do Ecossistema Argus
+# ArgusServer — o Cérebro do Ecossistema Argus
 
 ![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.2-6DB33F?logo=springboot&logoColor=white)
@@ -13,7 +13,7 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 
 ---
 
-## 🎯 Objetivo
+## Objetivo
 
 - Registrar sessões de prova (aluno + prova = uma sessão com UUID próprio).
 - Receber e persistir eventos vindos do plugin e da visão computacional.
@@ -24,7 +24,7 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 
 ---
 
-## 🧩 Papel no ecossistema
+## Papel no ecossistema
 
 | Componente | Fala com o ArgusServer via | O que manda |
 |---|---|---|
@@ -45,7 +45,7 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 
 ---
 
-## 🗃️ Modelo de domínio
+## Modelo de domínio
 
 | Entidade | O que representa |
 |---|---|
@@ -57,7 +57,7 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 
 ---
 
-## 📡 Tipos de evento suportados
+## Tipos de evento suportados
 
 | Tipo | Origem | Descrição |
 |---|---|---|
@@ -76,7 +76,7 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 
 ---
 
-## 🌐 API REST
+## API REST
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -103,7 +103,7 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 
 ---
 
-## 🔌 WebSocket
+## WebSocket
 
 | Canal | Protocolo | Quem usa | Pra quê |
 |---|---|---|---|
@@ -114,10 +114,10 @@ Os dois canais convivem de propósito em implementações separadas — misturar
 
 ---
 
-## 🖥️ Dashboards
+## Dashboards
 
 ### `dashboard.html` — visão geral
-- Um card por aluno, com indicador de status (🟢 tudo ok / 🟡 um dos dois com problema / 🔴 os dois caídos).
+- Um card por aluno, com indicador de status (verde: tudo ok / amarelo: um dos dois com problema / vermelho: os dois caídos).
 - Cronômetro da prova (por prova) e do aluno (por sessão), sem se confundir entre provas diferentes rodando ao mesmo tempo.
 - Preview da webcam atualizado a cada frame.
 - Botão para iniciar oficialmente uma prova e para encerrar provas (individual ou geral).
@@ -127,7 +127,7 @@ Os dois canais convivem de propósito em implementações separadas — misturar
 
 ---
 
-## 🗂️ Persistência
+## Persistência
 
 | Onde | Pra quê |
 |---|---|
@@ -136,7 +136,7 @@ Os dois canais convivem de propósito em implementações separadas — misturar
 
 ---
 
-## ⚙️ Configuração
+## Configuração
 
 `src/main/resources/application.properties`:
 
@@ -158,7 +158,7 @@ spring.redis.port=6379
 
 ---
 
-## ▶️ Como rodar
+## Como rodar
 
 ### Requisitos
 - Java 17+
@@ -174,7 +174,7 @@ O servidor sobe em `http://localhost:8080` — e o dashboard fica em `http://loc
 
 ---
 
-## 🔐 Considerações
+## Considerações
 
 - Arquitetura pensada para **múltiplos alunos simultâneos** numa mesma sala.
 - Eventos são imutáveis depois de persistidos — servem como registro de auditoria.
@@ -182,7 +182,7 @@ O servidor sobe em `http://localhost:8080` — e o dashboard fica em `http://loc
 
 ---
 
-## 🔗 Projetos relacionados
+## Projetos relacionados
 
 - **[Argus](https://github.com/IsaacLuiz88/Argus)** — plugin Eclipse, cliente principal.
 - **[ArgusVision](https://github.com/IsaacLuiz88/ArgusVision)** — monitoramento visual via webcam.
