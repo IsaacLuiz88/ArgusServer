@@ -18,8 +18,9 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 - Registrar sessões de prova (aluno + prova = uma sessão com UUID próprio).
 - Receber e persistir eventos vindos do plugin e da visão computacional.
 - Detectar automaticamente sinais de ferramentas de IA instaladas no Eclipse do aluno.
-- Manter em tempo real o status "ATIVO / INATIVO / OFFLINE" de cada aluno (plugin e câmera, separadamente).
+- Exibir em tempo real o status "ATIVO / INATIVO / OFFLINE" de cada aluno (plugin e câmera, separadamente) — calculado pelo próprio dashboard a partir dos eventos e heartbeats que chegam por WebSocket.
 - Permitir que o professor **encerre a prova remotamente**, de um aluno específico ou de todos de uma vez.
+- Permitir o **encerramento definitivo** de uma prova: depois disso, o código dela não aceita mais nenhuma sessão nova.
 - Servir dois dashboards web prontos: visão geral (`dashboard.html`) e visão individual (`student.html`).
 
 ---
@@ -36,7 +37,7 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 [ Argus Plugin ]  ── HTTP /api/event ──┐
                   ── WS /ws-command ───┤
                                         ├──►  ArgusServer  ──┬──► MySQL   (histórico)
-[ ArgusVision  ]  ── HTTP /api/event ──┘                     ├──► Redis   (atividade em tempo real)
+[ ArgusVision  ]  ── HTTP /api/event ──┘                     ├──► Redis   (última atividade)
                                                                └──► /topic/events (STOMP)
                                                                         │
                                                                         ▼
@@ -50,10 +51,10 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 | Entidade | O que representa |
 |---|---|
 | `StudentEntity` | O aluno, identificado unicamente pelo **nome**. |
-| `ExamEntity` | A prova, identificada por um **código** único. Guarda `startedAt` — só é preenchido quando o professor clica em "Iniciar Prova" no dashboard. |
+| `ExamEntity` | A prova, identificada por um **código** único. Guarda `startedAt` (preenchido quando o professor clica em "Iniciar Prova") e `endedAt` (preenchido no encerramento definitivo; a partir daí a prova é considerada fechada). |
 | `SessionEntity` | Uma sessão ativa por aluno + prova, com UUID próprio (`nome_codigoDaProva_uuidCurto`) e status `ACTIVE` ou `FINISHED`. |
 | `EventEntity` | Cada evento recebido, sempre associado a uma sessão, com o JSON bruto guardado em `raw` pra auditoria. |
-| `SessionActivityEntity` | O "último estado conhecido" de cada sessão — última ação, último tipo, último timestamp. É o que alimenta o status em tempo real do dashboard. |
+| `SessionActivityEntity` | O "último estado conhecido" de cada sessão — última ação, último tipo, último timestamp. É atualizado a cada evento, mas hoje nenhuma rota o expõe — o dashboard não lê essa tabela. |
 
 ---
 
@@ -80,11 +81,12 @@ O **ArgusServer** é o backend central (Spring Boot) que recebe eventos comporta
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/api/session/start` | Registra (ou recupera) a sessão ativa de um aluno numa prova. |
-| `GET` | `/api/session/active` | Primeira sessão ativa do sistema. |
+| `POST` | `/api/session/start` | Registra (ou recupera) a sessão ativa de um aluno numa prova. Responde `409` se a prova já foi encerrada definitivamente. |
+| `GET` | `/api/session/active` | Primeira sessão ativa do sistema (legado; não serve para salas com vários alunos — use a rota por aluno). |
 | `GET` | `/api/session/active/{student}` | Sessão ativa **de um aluno específico** — é o que o ArgusVision usa. |
 | `POST` | `/api/session/end/{student}` | Encerra a sessão ativa do aluno. |
 | `POST` | `/api/session/exam/start/{exam}` | Marca oficialmente o início da prova (botão "Iniciar Prova" do dashboard). |
+| `POST` | `/api/session/exam/close/{exam}` | Encerra a prova **definitivamente**: marca `endedAt`, finaliza (com shutdown via WebSocket) as sessões ainda ativas nela e passa a rejeitar sessões novas com esse código (botão "Encerrar prova definitivamente"). |
 | `POST` | `/api/event` | Recebe qualquer evento (comportamental ou visual). |
 | `POST` | `/api/command/shutdown/{student}` | Encerra a prova de um aluno remotamente. |
 | `POST` | `/api/command/shutdown-all` | Encerra a prova de todos os alunos ativos. |
@@ -120,7 +122,7 @@ Os dois canais convivem de propósito em implementações separadas — misturar
 - Um card por aluno, com indicador de status (verde: tudo ok / amarelo: um dos dois com problema / vermelho: os dois caídos).
 - Cronômetro da prova (por prova) e do aluno (por sessão), sem se confundir entre provas diferentes rodando ao mesmo tempo.
 - Preview da webcam atualizado a cada frame.
-- Botão para iniciar oficialmente uma prova e para encerrar provas (individual ou geral).
+- Botões para iniciar oficialmente uma prova, encerrar a prova de um aluno, encerrar todas as sessões ativas e encerrar uma prova definitivamente.
 
 ### `student.html` — visão individual
 - Mesma ideia, focada em um único aluno, com log de eventos mais detalhado e tradução amigável das ações (`EVENTOS_PT`).
@@ -132,7 +134,7 @@ Os dois canais convivem de propósito em implementações separadas — misturar
 | Onde | Pra quê |
 |---|---|
 | **MySQL** | Histórico completo e auditável — alunos, provas, sessões e eventos. |
-| **Redis** | "Última atividade" de cada sessão — leitura rápida, sem bater no banco a cada segundo. |
+| **Redis** | Grava o timestamp da última atividade de cada sessão (chave `activity:{prova}:{aluno}`). Hoje é só escrita: o método de leitura (`ActivityService.getLastActivity`) existe, mas nada o chama ainda. |
 
 ---
 
@@ -150,11 +152,11 @@ spring.datasource.password=
 
 spring.jpa.hibernate.ddl-auto=update
 
-spring.redis.host=127.0.0.1
-spring.redis.port=6379
 ```
 
 > Repare que o MySQL está configurado na porta **3307**, não a 3306 padrão — ajuste conforme sua instalação.
+>
+> O Redis, por outro lado, **não é configurável por propriedades**: `RedisConfig` cria a conexão com os valores padrão (`localhost:6379`). Mesmo o `application.properties` trazendo `spring.redis.*`, essas chaves não têm efeito (no Spring Boot 3 o prefixo seria `spring.data.redis`, e a conexão também não as usa).
 
 ---
 
@@ -163,12 +165,13 @@ spring.redis.port=6379
 ### Requisitos
 - Java 17+
 - MySQL rodando (banco `argus_db` é criado/atualizado automaticamente via `ddl-auto=update`)
-- Redis rodando
+- Redis rodando em `localhost:6379`
 
 ### Passos
 ```bash
 mvn spring-boot:run
 ```
+Ou execute a classe `ArgusServerApplication` direto pela IDE.
 
 O servidor sobe em `http://localhost:8080` — e o dashboard fica em `http://localhost:8080/dashboard.html`.
 
@@ -178,6 +181,7 @@ O servidor sobe em `http://localhost:8080` — e o dashboard fica em `http://loc
 
 - Arquitetura pensada para **múltiplos alunos simultâneos** numa mesma sala.
 - Eventos são imutáveis depois de persistidos — servem como registro de auditoria.
+- Os endpoints não têm autenticação: qualquer máquina que alcance o servidor consegue chamar as rotas de `/api/command` e `/api/session`. Hoje ele deve ser usado apenas em rede controlada (a rede do laboratório).
 - Ponto natural de extensão: autenticação do professor, alertas automáticos, relatórios pós-prova.
 
 ---
