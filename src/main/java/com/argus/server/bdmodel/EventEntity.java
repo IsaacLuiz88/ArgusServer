@@ -2,6 +2,8 @@ package com.argus.server.bdmodel;
 
 import java.time.LocalDateTime;
 
+import org.hibernate.Length;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -25,8 +27,8 @@ public class EventEntity {
     private String action;
     private LocalDateTime receivedAt;
 
-    @Lob
-    @Column(columnDefinition = "LONGTEXT")
+    // Length.LONG32: o Hibernate escolhe LONGTEXT no MySQL e TEXT no PostgreSQL.
+    @Column(length = Length.LONG32)
     private String raw;
 
     private String ip;

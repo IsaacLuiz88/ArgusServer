@@ -37,6 +37,13 @@
 		    <scope>runtime</scope>
 		</dependency>
 
+		<!-- PostgreSQL (hospedagem online, ex.: Neon) - perfil "prod"; o MySQL segue como padrão local -->
+		<dependency>
+		    <groupId>org.postgresql</groupId>
+		    <artifactId>postgresql</artifactId>
+		    <scope>runtime</scope>
+		</dependency>
+
 		<!-- JPA (OBRIGATÓRIO) -->
 		<dependency>
 		    <groupId>org.springframework.boot</groupId>
@@ -138,5 +145,13 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <!-- Faz o "mvn package" gerar um jar executavel (java -jar) com as dependencias -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 </project>

@@ -1,5 +1,6 @@
 package com.argus.server.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.argus.server.model.Event;
 import com.argus.server.bdmodel.*;
@@ -23,6 +24,10 @@ public class EventService {
     private final ActivityService activityService;
 
     private final ObjectMapper mapper = new ObjectMapper();
+
+    // argus.event-log-files=false desliga o log em arquivo (o histórico completo já fica no banco).
+    @Value("${argus.event-log-files:true}")
+    private boolean eventLogFiles;
 
     public EventService(
             EventRepository eventRepository,
@@ -183,12 +188,22 @@ public class EventService {
 //        return true;
     }
 
+    // Aluno e prova vêm do cliente: viram parte do caminho do arquivo, então só
+    // letras, números, espaço, "_", "-" e "." passam (nada de "/", barra invertida ou "..").
+    private static String safeName(String value, String fallback) {
+        if (value == null) return fallback;
+        String s = value.replaceAll("[^\\p{L}\\p{N} _.-]", "_").trim();
+        if (s.length() > 80) s = s.substring(0, 80);
+        return (s.isEmpty() || s.matches("\\.+")) ? fallback : s;
+    }
+
     private void saveEventToLog(Event event, String student, String exam) {
+        if (!eventLogFiles) return;
         try {
-        	String dir = "logs/" + (exam != null ? exam : "default");
+        	String dir = "logs/" + safeName(exam, "default");
             Files.createDirectories(Paths.get(dir));
 
-            String fileName = dir + "/" + (student != null ? student : "Anonimo") + ".log";
+            String fileName = dir + "/" + safeName(student, "Anonimo") + ".log";
             Files.write(
                 Paths.get(fileName),
                 (event.toString() + System.lineSeparator()).getBytes(),
