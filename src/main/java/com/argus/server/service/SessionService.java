@@ -4,6 +4,7 @@ import com.argus.server.bdmodel.*;
 import com.argus.server.repository.SessionRepository;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,17 @@ public class SessionService {
 		this.activityService = activityService;
 	}
 
+	// O id da sessão vai em URL (/ws-command/{id}), em JSON e em atributos HTML. Nomes reais
+	// têm espaço, acento, "/" etc. ("Ângela Maria") e quebravam a conexão do plugin; aqui vira
+	// ASCII simples ("Angela_Maria"). O sufixo aleatório mantém o id único.
+	static String safeIdPart(String value) {
+		String s = Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
+				.replaceAll("\\p{M}+", "")
+				.replaceAll("[^A-Za-z0-9_-]+", "_");
+		if (s.length() > 40) s = s.substring(0, 40);
+		return s.isEmpty() ? "x" : s;
+	}
+
 	public SessionEntity create(StudentEntity student, ExamEntity exam) {
 		SessionEntity s = new SessionEntity();
         s.setStudent(student);
@@ -27,8 +39,8 @@ public class SessionService {
         
         // PADRONIZADO: nome_prova_uuid
         String uuid = String.format("%s_%s_%s", 
-            student.getName(), 
-            exam.getCode(), 
+            safeIdPart(student.getName()), 
+            safeIdPart(exam.getCode()), 
             UUID.randomUUID().toString().substring(0, 8)); // UUID curto para facilitar log
 
         s.setSessionUuid(uuid);
