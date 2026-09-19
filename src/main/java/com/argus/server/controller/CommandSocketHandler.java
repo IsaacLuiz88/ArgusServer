@@ -47,6 +47,15 @@ public class CommandSocketHandler extends TextWebSocketHandler {
         wsSession.getAttributes().put(SESSION_ATTR, sessionUuid);
         sessions.put(sessionUuid, wsSession);
         System.out.println("[WS-COMMAND] conectado: " + sessionUuid);
+
+        // Plugin que estava offline quando a prova foi encerrada (ou que reconectou depois):
+        // manda encerrar na hora, em vez de deixá-lo monitorando uma sessão já finalizada.
+        sessionService.findByUuid(sessionUuid)
+                .filter(s -> !"ACTIVE".equals(s.getStatus()))
+                .ifPresent(s -> {
+                    System.out.println("[WS-COMMAND] sessão já encerrada, enviando shutdown: " + sessionUuid);
+                    sendShutdown(sessionUuid);
+                });
     }
 
     @Override
@@ -67,7 +76,9 @@ public class CommandSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession wsSession, CloseStatus status) {
         String sessionUuid = (String) wsSession.getAttributes().get(SESSION_ATTR);
-        sessions.remove(sessionUuid);
+        // remove(chave, valor): só desmapeia se ainda for ESTE socket. Com reconexão, o socket
+        // antigo pode fechar depois de o novo conectar, e não pode apagar o novo.
+        sessions.remove(sessionUuid, wsSession);
         System.out.println("[WS-COMMAND] desconectado: " + sessionUuid + " (" + status + ")");
     }
 
@@ -83,6 +94,10 @@ public class CommandSocketHandler extends TextWebSocketHandler {
         System.out.println("[WS-COMMAND] heartbeat recebido: " + sessionUuid);
 
         sessionService.findByUuid(sessionUuid).ifPresentOrElse(session -> {
+            if (!"ACTIVE".equals(session.getStatus())) {
+                sendShutdown(sessionUuid); // heartbeat de sessão encerrada: não conta como atividade
+                return;
+            }
             Event event = new Event();
             event.setType("heartbeat");
             event.setSession(sessionUuid);
